@@ -1,65 +1,129 @@
 version: '3.7'
 
+x-minio-common: &minio-common
+  image: minio/minio
+  restart: always
+  expose:
+    - "9000"
+    - "9001"
+  environment:
+    MINIO_ROOT_USER: minioadmin
+    MINIO_ROOT_PASSWORD: minioadmin
+    MINIO_PROMETHEUS_URL: http://prometheus:9090
+    MINIO_ETCD_ENDPOINTS: http://etcd:2379
+  links:
+    - prometheus
+    - etcd
+  command: server --console-address ':9001' --address ':9000' http://minio-{1...4}/data{1...5}
+  networks:
+    - local
+  healthcheck:
+    test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+    interval: 30s
+    timeout: 20s
+    retries: 3
+
 services:
   etcd:
     container_name: "etcd"
     hostname: "etcd"
     image: bitnami/etcd
+    restart: always
     environment:
       ALLOW_NONE_AUTHENTICATION:  yes
     ports:
-      - "12379:2379"
-      - "12380:2380"
+      - "2379:2379"
+      - "2380:2380"
     expose:
       - "2379"
       - "2380"
     volumes:
-      - "/Users/xingshanghe/docker/etcd/config:/opt/bitnami/etcd/conf"
-      - "/Users/xingshanghe/docker/etcd/data:/bitnami/etcd/data"
+      - "/data/sda/docker/etcd/config:/opt/bitnami/etcd/conf"
+      - "/data/sda/docker/etcd/data:/bitnami/etcd/data"
     networks:
       - local
 
-  minio:
-    container_name: "minio"
-    hostname: "minio"
-    image: minio/minio
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-      MINIO_PROMETHEUS_URL: http://host.docker.internal:9090
-      MINIO_ETCD_ENDPOINTS: http://host.docker.internal:12379
-    links:
-      - prometheus
-      - etcd
-    command: server /data{1...8} --console-address ':9001' --address ':9000'
+  minio-1:
+    <<: *minio-common
+    container_name: "minio-1"
+    hostname: "minio-1"
     volumes:
-      - "/Users/xingshanghe/docker/minio/data1:/data1"
-      - "/Users/xingshanghe/docker/minio/data2:/data2"
-      - "/Users/xingshanghe/docker/minio/data3:/data3"
-      - "/Users/xingshanghe/docker/minio/data4:/data4"
-      - "/Users/xingshanghe/docker/minio/data5:/data5"
-      - "/Users/xingshanghe/docker/minio/data6:/data6"
-      - "/Users/xingshanghe/docker/minio/data7:/data7"
-      - "/Users/xingshanghe/docker/minio/data8:/data8"
-    networks:
-      - local
+      - "/data/sda/docker/minio-1/data:/data1"
+      - "/data/sdb/docker/minio-1/data:/data2"
+      - "/data/sdc/docker/minio-1/data:/data3"
+      - "/data/sdd/docker/minio-1/data:/data4"
+      - "/data/sde/docker/minio-1/data:/data5"
+
+  minio-2:
+    <<: *minio-common
+    container_name: "minio-2"
+    hostname: "minio-2"
+    volumes:
+      - "/data/sda/docker/minio-2/data:/data1"
+      - "/data/sdb/docker/minio-2/data:/data2"
+      - "/data/sdc/docker/minio-2/data:/data3"
+      - "/data/sdd/docker/minio-2/data:/data4"
+      - "/data/sde/docker/minio-2/data:/data5"
+
+  minio-3:
+    <<: *minio-common
+    container_name: "minio-3"
+    hostname: "minio-3"
+    volumes:
+      - "/data/sda/docker/minio-3/data:/data1"
+      - "/data/sdb/docker/minio-3/data:/data2"
+      - "/data/sdc/docker/minio-3/data:/data3"
+      - "/data/sdd/docker/minio-3/data:/data4"
+      - "/data/sde/docker/minio-3/data:/data5"
+
+  minio-4:
+    <<: *minio-common
+    container_name: "minio-4"
+    hostname: "minio-4"
+    volumes:
+      - "/data/sda/docker/minio-4/data:/data1"
+      - "/data/sdb/docker/minio-4/data:/data2"
+      - "/data/sdc/docker/minio-4/data:/data3"
+      - "/data/sdd/docker/minio-4/data:/data4"
+      - "/data/sde/docker/minio-4/data:/data5"
 
   prometheus:
     container_name: "prometheus"
     hostname: "prometheus"
     image: prom/prometheus
+    restart: always
     ports:
       - "9090:9090"
     volumes:
       - type: bind
-        source: /Users/xingshanghe/docker/prometheus/config/prometheus.yml
+        source: /data/sda/docker/prometheus/config/prometheus.yml
         target: /etc/prometheus/prometheus.yml
     networks:
       - local
 
+  # nginx minio LB
+  minio:
+    container_name: minio
+    hostname: minio
+    image: nginx:1.19.2-alpine
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    links:
+      - minio-1
+      - minio-2
+      - minio-3
+      - minio-4
+    depends_on:
+      - minio-1
+      - minio-2
+      - minio-3
+      - minio-4
+    volumes:
+      - /data/sda/docker/nginx/config/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - local
 
 networks:
   local:
